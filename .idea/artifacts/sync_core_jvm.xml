@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="sync-core-jvm">
+    <output-path>$PROJECT_DIR$/sync-core/build/libs</output-path>
+    <root id="archive" name="sync-core-jvm.jar">
+      <element id="module-output" name="StandAlone.sync-core.jvmMain" />
+    </root>
+  </artifact>
+</component>
