@@ -14,7 +14,13 @@ public final class JavaApiSmoke {
         try {
             main(new String[]{"create", file.getPath()});
             main(new String[]{"recover", file.getPath()});
-        } finally { file.delete(); dir.delete(); }
+        } finally { deleteTree(dir.toPath()); }
+    }
+    static void deleteTree(java.nio.file.Path root) throws java.io.IOException {
+        try (var paths = java.nio.file.Files.walk(root)) {
+            for (var path : paths.sorted(java.util.Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList()))
+                java.nio.file.Files.delete(path);
+        }
     }
     public static void main(String[] args) {
         FileLocalStore local = new FileLocalStore(new File(args[1]));

@@ -19,6 +19,8 @@ class InMemoryRemoteStore : RemoteStore {
 
     private var state = State()
 
+    internal fun fork() = InMemoryRemoteStore().also { it.state = state }
+
     override fun applyOperation(operation: SyncOperation): ApplyResult {
         val newRecords: Map<String, String?>
         val newOperations: Map<String, ProcessedOperation>

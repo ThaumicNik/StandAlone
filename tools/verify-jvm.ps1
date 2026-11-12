@@ -33,5 +33,12 @@ try {
     if ($LASTEXITCODE) { throw 'Java API write failed' }
     & java -cp "$out/main;$out/test;$stdlib" com.edu.standalone.server.JavaApiSmoke recover $smokeFile
     if ($LASTEXITCODE) { throw 'Fresh JVM recovery failed' }
-} finally { Remove-Item -LiteralPath $smokeFile -ErrorAction SilentlyContinue }
+} finally {
+    Remove-Item -LiteralPath $smokeFile -ErrorAction SilentlyContinue
+    $smokeEvents = [IO.Path]::GetFullPath($smokeFile + '.events')
+    $checkRoot = [IO.Path]::GetFullPath($out) + [IO.Path]::DirectorySeparatorChar
+    if ($smokeEvents.StartsWith($checkRoot, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $smokeEvents)) {
+        Remove-Item -LiteralPath $smokeEvents -Recurse -Force
+    }
+}
 

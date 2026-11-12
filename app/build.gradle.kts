@@ -36,7 +36,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime:2.11.2")
     implementation(project(":sync-core"))
+    implementation(project(":sync-retrofit"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

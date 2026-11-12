@@ -27,3 +27,4 @@ include(":app")
 include(":sync-core")
  
 include(":sync-server")
+include(":sync-retrofit")

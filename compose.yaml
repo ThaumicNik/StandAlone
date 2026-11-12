@@ -1,0 +1,12 @@
+services:
+  task-backend:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SYNC_BIND_ADDRESS: "0.0.0.0"
+    volumes:
+      - task-data:/data
+    restart: unless-stopped
+volumes:
+  task-data:

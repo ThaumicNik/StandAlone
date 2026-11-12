@@ -1,0 +1,6 @@
+**
+!sync-server/
+!sync-server/build/
+!sync-server/build/install/
+!sync-server/build/install/sync-server/
+!sync-server/build/install/sync-server/**

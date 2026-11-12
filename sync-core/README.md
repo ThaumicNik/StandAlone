@@ -1,4 +1,4 @@
-﻿# sync-core
+# sync-core
 
 Kotlin Multiplatform synchronization library, currently targeting JVM 11.
 Kotlin and Java consumers use the same blocking API. Android calls it on a
@@ -13,17 +13,33 @@ corresponding server revision has been downloaded.
 Adapters:
 
 - `InMemoryLocalStore`, `InMemoryRemoteStore`: sequential algorithm testing.
-- `FileLocalStore`: durable records, audit, delivery and cursor via atomic file
-  replacement. One client/process owns each file and serializes API calls.
+- `FileLocalStore`: durable records, audit, delivery and cursor via immutable event
+  files. One client/process owns each store and serializes API calls.
 - `FileRemoteStore`: synchronized durable acceptance and deduplication history.
 - `HttpRemoteStore`: blocking HTTP adapter with finite timeouts and explicit
   temporary-error classification.
 
-Files use a versioned event snapshot, fsync before atomic replacement, and fail
-closed for an invalid file. History is retained indefinitely; snapshot rewrites
-and replay favor a small MVP over large datasets. Filesystem support for atomic
-rename is required. Power loss durability of directory metadata is filesystem
-dependent; process-restart recovery is covered by tests.
+Each new event is fsynced and atomically published under `<file>.events/`.
+Existing version-1 snapshot files remain readable and are retained as the base.
+Backups and moves must include both the base file (if present) and its `.events`
+directory. Older library versions cannot read the new events. Never delete or
+rename individual event files. Unpublished `.tmp` files are ignored on recovery.
+History is retained indefinitely. Writes no longer replay or rewrite all history,
+but in-memory collection copies, startup replay and the number of event files
+still grow with history. Large installations need a database adapter or a separately
+designed compaction protocol. Atomic rename support is required; directory metadata
+power-loss durability remains filesystem dependent.
+
+Download phases default to ten pages each so a growing feed cannot indefinitely
+block uploads. A pass can finish with remote history remaining; schedule subsequent
+passes to catch up. The file-backed server limits pages to 8 MiB of encoded changes;
+local journal events are limited to 16 MiB before publication.
+
+Integration requires full string SET/DEL payloads and a compatible ordered change
+feed with operation-ID deduplication. Server acceptance order decides conflicts;
+field merging and arbitrary REST API integration require application-specific work.
+The Retrofit adapter accepts an injected OkHttpClient for credentials, TLS settings
+and timeouts. The default client uses 30-second connect/read and 60-second call limits.
 
 The `sync-server` Java application is also a Java consumer of the library.
 The Android demo provides record editing, manual synchronization and delivery

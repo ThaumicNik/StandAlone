@@ -26,8 +26,7 @@ class FileLocalStore(file: File) : LocalStore {
         require(input.read() == -1)
     }
     private fun commit(event: ByteArray) {
-        val candidate = InMemoryLocalStore()
-        journal.replay { apply(candidate, it) }
+        val candidate = memory.fork()
         apply(candidate, DataInputStream(event.inputStream()))
         journal.append(event)
         memory = candidate
@@ -63,13 +62,20 @@ class FileRemoteStore(file: File) : RemoteStore {
             return memory.applyOperation(operation)
         }
         // Validate and compute on a candidate so failed disk writes cannot publish a revision.
-        val candidate = InMemoryRemoteStore()
-        journal.replay { candidate.applyOperation(Wire.operation(it)) }
+        val candidate = memory.fork()
         val result = candidate.applyOperation(operation)
         journal.append(Wire.encode { Wire.operation(it, operation) })
         memory.applyOperation(operation)
         known[operation.operationId] = operation
         return result
     }
-    @Synchronized override fun getChanges(afterCursor: Long, limit: Int) = memory.getChanges(afterCursor, limit)
+    @Synchronized override fun getChanges(afterCursor: Long, limit: Int): ChangesPage {
+        val page = memory.getChanges(afterCursor, limit)
+        var bytes = 0
+        val changes = page.remoteChanges.takeWhile {
+            bytes += Wire.encode { out -> Wire.operation(out, it.operation); out.writeLong(it.serverRevision) }.size
+            bytes <= 8 * 1048576
+        }
+        return ChangesPage(changes, changes.lastOrNull()?.serverRevision ?: afterCursor)
+    }
 }

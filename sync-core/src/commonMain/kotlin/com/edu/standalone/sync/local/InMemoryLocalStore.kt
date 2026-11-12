@@ -10,6 +10,12 @@ class InMemoryLocalStore : LocalStore {
     private var deliveries = emptyMap<String, OperationDelivery>()
     private var cursor = 0L
 
+    /** Immutable collections can be shared until either instance publishes a replacement. */
+    internal fun fork() = InMemoryLocalStore().also {
+        it.confirmed = confirmed; it.operations = operations
+        it.deliveries = deliveries; it.cursor = cursor
+    }
+
     override fun get(entityId: String): String? {
         val overlay = operations.lastOrNull {
             val delivery = deliveries.getValue(it.operationId)
