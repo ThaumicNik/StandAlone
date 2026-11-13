@@ -36,6 +36,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.11.0")
     implementation("androidx.work:work-runtime:2.11.2")
     implementation(project(":sync-core"))
     implementation(project(":sync-retrofit"))

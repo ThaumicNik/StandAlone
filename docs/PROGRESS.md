@@ -1,84 +1,65 @@
-﻿# Журнал прогресса
+# Project progress
 
-## Чек-лист всего проекта
+Current status: 13 November 2026. Historical entries below describe their own
+checkouts; this section is the current source of status.
 
-Отмечены только подтверждённые результаты. Незавершённый пункт может быть частично реализован; подробности приведены ниже. Основной объём определяется [MVP.md](MVP.md), исследовательские результаты — [PROJECT.md](PROJECT.md).
+| Area | Current result | Remaining acceptance |
+| --- | --- | --- |
+| Local core | Offline GET/SET/DEL, immutable audit, delivery state, entity/sequence indexes | Large-history performance and retention policy |
+| Synchronization | Ordered pull/send/pull, deduplicated retries, pending overlays, bounded download passes | Broader fault-injection experiments |
+| Durability | Legacy snapshot support, immutable fsynced event files, streamed recovery, empty-poll suppression | Directory metadata power-loss guarantees; database adapter/compaction |
+| HTTP/backend | Java sync/task server, HTTP and Retrofit adapters, optional shared token, loopback defaults | Per-user authorization, production transport/deployment |
+| Android | Compose tasks/search/status, ViewModel, saved drafts, endpoint-scoped histories, WorkManager | Connected-device lifecycle/background/network checks |
+| Library packaging | Local Maven publications with metadata; independent Java consumer | Public distribution/versioning policy; additional targets deferred |
+| Research | Runnable desktop journal/backlog smoke benchmark and experiment protocol | Repeated comparative unstable-network measurements |
 
-### Локальное ядро
+## Changes on 13 November
 
-- [x] Выделить библиотечный модуль sync-core и настроить отдельную JVM-сборку.
-- [x] Описать неизменяемые операции SET/DEL и отдельное состояние доставки.
-- [x] Определить LocalStore и реализовать хранилище в памяти.
-- [x] Реализовать локальные GET/SET/DEL через SyncClient.
-- [x] Продолжать localSequence по истории текущего клиента при пересоздании SyncClient.
-- [x] Завершить сквозную проверку создания, чтения, изменения, удаления и восстановления с аудитом и PENDING.
+- Remote calls no longer hold the local transaction boundary. SerializedLocalStore
+  protects individual store calls; compound edits use access; sync passes are
+  serialized independently. A latch-controlled regression test checks local editing
+  during a blocked remote response and preservation of the newer pending value.
+- Each normalized endpoint owns its journal/cursor/status. Existing sync.bin is
+  bound to the pre-upgrade endpoint without moving or deleting files. Returning
+  to an endpoint resumes its queue. Drafts are scoped to endpoints too.
+- A ViewModel owns asynchronous UI work and saved-state drafts. Failed persistence
+  keeps the editor open; successful persistence closes it. A stable draft task ID
+  prevents duplicate task creation when retrying after callback interruption.
+- Status writes read the latest local JSON inside one local transaction, preserving
+  local fields changed after the UI snapshot. Cross-client conflict behavior is
+  still whole-record last-server-accepted replacement, explicitly documented.
+- Empty remote pages validate the cursor without writing an event. Recovery streams
+  history without retaining encoded event copies. Entity/sequence indexes and
+  direct slicing of the ordered remote feed remove several history scans.
+- Local Maven publications and an independent Java build verify artifact metadata
+  and transitive dependencies. Public-registry upload is not configured.
+- Root/module/protocol documentation now states current behavior and remaining
+  limits. VALIDATION.md separates automated, device and research acceptance.
 
-### Синхронизация и сохранность
+## Validation
 
-- [x] Согласовать контракт удалённой стороны и ответы на применение операций.
-- [x] Реализовать удалённую сторону в памяти: однократное применение, повтор по operationId и серверные ревизии.
-- [x] Реализовать отправку ожидающих операций в порядке localSequence, подтверждения и обработку ошибок доставки.
-- [x] Реализовать получение серверных изменений по курсору, включая отметки удаления.
-- [x] Сохранять более новые локальные изменения при загрузке серверных данных и подтверждении предыдущих операций.
-- [x] Проверить потерю ответа, повторную отправку, конкурирующие SET/DEL и сходимость двух клиентов по серверному порядку.
-- [x] Добавить постоянное локальное хранилище с атомарным сохранением данных, аудита, доставки и курсора.
-- [x] Проверить восстановление данных и очереди после перезапуска процесса.
+All 49 host tests passed (43 core, 2 Retrofit, 2 backend and 2 Android URL tests); both Android APKs build successfully.
+The independent published-artifact Java consumer passed. Detailed final counts and
+benchmark measurements are recorded in REVIEW.md and BENCHMARKS.md after verification.
+No Android device was attached (`adb devices` returned an empty list); the device
+suite compiled but has not run. No UI appearance or real background scheduling is
+claimed as verified.
 
-### Сервер и использование библиотеки
+## Remaining work
 
-- [x] Зафиксировать REST-протокол: операции, ответы, ошибки, ревизии и страницы изменений.
-- [x] Реализовать REST-сервер и сетевой адаптер; проверить синхронизацию при сбоях связи.
-- [ ] Подключить Android-приложение и проверить полный сценарий работы без сети и после её восстановления.
-- [x] Проверить использование публичного API из Kotlin и Java на JVM; при необходимости добавить удобный Java-фасад.
-- [x] Подготовить документацию подключения, примеры и описание ограничений библиотеки.
+- Run the connected-device suite and manual scenarios in VALIDATION.md.
+- Measure repeated workloads and compare queue/deduplication approaches under
+  controlled network faults. Desktop smoke timings do not complete the research.
+- Design a versioned optimistic-concurrency protocol if explicit conflicts are
+  required; v1 has no base entity version or conflict negotiation.
+- Add a transactional database adapter or safe compaction after measuring growth.
+  Immutable collection copies, retained audit/deduplication/tombstones and event
+  counts still grow. Never delete individual segments to reclaim space.
+- URL identity cannot detect replacement of a server at the same address. Use a
+  new URL identity or preserve server history. Automatic server identity recovery,
+  full rejected-operation management and durable draft storage remain future work.
 
-### Исследование и дальнейшее развитие
-
-- [ ] Подготовить сравнительные варианты и сценарии экспериментов по PROJECT.md.
-- [ ] Провести измерения и оформить фактические результаты, архитектуру и ограничения для ВКР.
-- [ ] После основной версии выбрать вторую платформу, собрать её и запустить проверки; другие языковые фасады добавлять по потребности. **Отложено: сейчас Kotlin и Java.**
-
-Последнее обновление: 03.11.2026.
-
-Концепция: [PROJECT.md](PROJECT.md). Архитектура и критерии минимальной версии: [MVP.md](MVP.md).
-
-## Текущий результат
-
-Реализованы локальный API, полный цикл pull–send–pull, страницы изменений и атомарное сохранение курсора. Подтверждённое состояние отделено от локальных ожидающих изменений; отказ исключает изменение из видимого слоя и сохраняет аудит. FileLocalStore восстанавливает записи, операции, доставку и курсор. FileRemoteStore сохраняет порядок ревизий и защиту от повторов. Добавлены HTTP-адаптер, Java REST-сервер и Android-демо с ручной синхронизацией.
-
-## Состояние этапов
-
-| № | Этап из MVP | Состояние | Проверка / ограничение |
-| --- | --- | --- | --- |
-| 1–4 | Модуль, модели, локальный API | Выполнены для JVM | Исходные тесты сохранены и проходят. |
-| 5 | Цикл синхронизации | Выполнен | Сходимость двух клиентов, SET/DEL, страницы, новые локальные изменения, отказ и потеря ответа. |
-| 6 | Постоянное хранилище | Выполнен для JVM | Повторное открытие, новый JVM-процесс, атомарный отказ записи. Один владелец файла; вызовы клиента последовательны. |
-| 7 | REST и адаптер | Выполнен для локального стенда | Реальный HTTP round trip и перезапуск сервера; протокол в REST.md. |
-| 8 | Android | Реализовано, проверка устройства не завершена | assembleDebug выполнен; GET/SET/DEL, постоянный clientId, файловое хранилище, рабочий поток и аудит подключены. Нет подключённого устройства. |
-| 9 | Другие потребители | Java проверена | Сервер и отдельный Java smoke-сценарий; прочие KMP-цели отложены. |
-
-## Что уже есть в коде
-
-- Общие модели SyncOperation, OperationDelivery и GET/SET/DEL через SyncClient.
-- InMemoryLocalStore: подтверждённые записи, ожидающий слой, аудит, доставка и курсор.
-- OperationSender и SyncEngine: последовательная отправка и полный pull–send–pull.
-- FileLocalStore, FileRemoteStore и Journal: версионированный файловый журнал с атомарной заменой.
-- Wire и HttpRemoteStore: бинарный REST-протокол v1 и HTTP-адаптер.
-- sync-server: отдельное Java-приложение; MainActivity: Android-демо.
-- Общие и JVM-тесты; tools/verify-jvm.ps1: отдельная проверка кешированными компиляторами.
-
-## Проверки и ограничения
-
-JVM-тесты проверяют исходные сценарии, сходимость двух клиентов, SET/DEL, защиту ожидающих изменений, отказ, некорректную страницу, HTTP, восстановление с диска и потерю ответа. Java smoke-сценарий отдельно запускается в двух JVM-процессах. Подробные итоговые числа и сборка указаны в записи от 03.11.2026 ниже.
-
-- Каждый локальный файл принадлежит одному клиенту/процессу; все вызовы клиента должны выполняться последовательно. Android использует один рабочий поток.
-- Файловый журнал переписывается целиком и не очищается. Это решение для небольшого стенда; оптимизация и миграции формата отложены.
-- Для фиксации требуется атомарное переименование в используемой файловой системе. Проверен отказ записи без публикации изменений. Гарантия сохранности метаданных каталога при потере питания отдельно не проверена.
-- Android запускает синхронизацию вручную. WorkManager и автоматический запуск при восстановлении сети остаются дальнейшей интеграцией.
-- Подключённых Android-устройств нет; офлайн-сценарий на устройстве не проверен.
-- Сервер предназначен для локальных тестовых данных, без авторизации и TLS. Бизнес-правила окончательного отказа не заданы; REJECTED поддерживается контрактом и тестовым адаптером.
-- Дополнительные KMP-платформы, расширенные конфликты, очистка истории и исследовательские измерения отложены.
-
+## Historical planning and verification log
 ## Согласованный план на 24.10.2026
 
 Это план оставшейся работы на день, а не отметка о выполнении. Пользователь сообщил, что вопросов нет: материал разобран по ходу работы. Сегодня завершаем проверку локального клиента; обсуждение удалённой стороны переносим на завтра.

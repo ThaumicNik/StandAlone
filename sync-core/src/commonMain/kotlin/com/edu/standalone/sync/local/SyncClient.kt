@@ -12,12 +12,7 @@ class SyncClient (
 ) {
 
     private fun getNextStepLocalSequence(): Long{
-        val operations = storage.getOperations()
-        val output: Long = operations
-            .asSequence()
-            .filter { clientId == it.clientId }
-            .maxOfOrNull { it.localSequence } ?: 0L
-        return output + 1
+        return storage.nextSequence(clientId)
     }
 
     /** Читает локальную запись без создания операции аудита. */

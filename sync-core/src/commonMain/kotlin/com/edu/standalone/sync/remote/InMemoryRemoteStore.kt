@@ -14,6 +14,7 @@ class InMemoryRemoteStore : RemoteStore {
     private data class State(
         val records: Map<String, String?> = emptyMap(),
         val operations: Map<String, ProcessedOperation> = emptyMap(),
+        val changes: List<RemoteChange> = emptyList(),
         val nextRevision: Long = 1L
     )
 
@@ -56,6 +57,7 @@ class InMemoryRemoteStore : RemoteStore {
         state = State(
             newRecords,
             newOperations,
+            state.changes + RemoteChange(operation, state.nextRevision),
             state.nextRevision + 1
         )
 
@@ -72,13 +74,11 @@ class InMemoryRemoteStore : RemoteStore {
         require(limit > 0L) {
             "limit should be > 0. Currently: $limit"
         }
-        val changesList: List<RemoteChange> = state.operations.values
-            .asSequence()
-            .filter { it.result is ApplyResult.Accepted && it.result.serverRevision > afterCursor }
-            .map { RemoteChange(it.operation, (it.result as ApplyResult.Accepted).serverRevision) }
-            .sortedBy { it.serverRevision }
-            .take(limit)
-            .toList()
+        // Revisions are contiguous and acceptance-ordered. Clamp before converting
+        // to Int so a cursor beyond the current history also returns an empty page.
+        val start = minOf(afterCursor, state.changes.size.toLong()).toInt()
+        val end = minOf(start.toLong() + limit, state.changes.size.toLong()).toInt()
+        val changesList = state.changes.subList(start, end).toList()
         return ChangesPage(
             changesList,
             if(changesList.isNotEmpty()) changesList.last().serverRevision else afterCursor

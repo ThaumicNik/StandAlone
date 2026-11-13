@@ -7,24 +7,27 @@ import java.nio.file.*
 internal class Journal(private val file: File) {
     private val segments = File(file.absolutePath + ".events")
     private var segmentCount = 0
-    private val events: MutableList<ByteArray> = (if (file.exists()) DataInputStream(file.inputStream()).use { input ->
-        require(input.readInt() == 0x53594E31) { "Unsupported store format" }
-        val count = input.readInt(); require(count >= 0)
-        List(count) {
-            val size = input.readInt(); require(size in 0..16777216)
-            ByteArray(size).also { input.readFully(it) }
-        }.also { require(input.read() == -1) }
-    } else emptyList()).toMutableList()
-    init {
+    fun replay(block: (DataInputStream) -> Unit) {
+        // Stream legacy events and segments one at a time instead of retaining
+        // another full encoded copy of history alongside the decoded store.
+        if (file.exists()) DataInputStream(file.inputStream().buffered()).use { input ->
+            require(input.readInt() == 0x53594E31) { "Unsupported store format" }
+            val count = input.readInt(); require(count >= 0)
+            repeat(count) {
+                val size = input.readInt(); require(size in 0..16777216)
+                val bytes = ByteArray(size).also { input.readFully(it) }
+                DataInputStream(bytes.inputStream()).use(block)
+            }
+            require(input.read() == -1)
+        }
         val files = segments.listFiles()?.filter { it.name.endsWith(".event") }?.sortedBy { it.name } ?: emptyList()
         files.forEachIndexed { index, segment ->
             require(segment.name == "%010d.event".format(index)) { "Missing journal segment" }
             require(segment.length() <= 16777216) { "Journal event exceeds 16 MiB" }
-            events.add(segment.readBytes())
+            DataInputStream(segment.inputStream().buffered()).use(block)
         }
         segmentCount = files.size
     }
-    fun replay(block: (DataInputStream) -> Unit) = events.forEach { block(DataInputStream(it.inputStream())) }
     fun append(event: ByteArray) {
         require(event.size <= 16777216) { "Journal event exceeds 16 MiB" }
         check(segments.isDirectory || segments.mkdirs()) { "Cannot create journal directory" }
@@ -37,6 +40,5 @@ internal class Journal(private val file: File) {
         val target = File(segments, "%010d.event".format(segmentCount))
         Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
         segmentCount++
-        events.add(event)
     }
 }

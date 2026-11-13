@@ -1,7 +1,42 @@
-﻿# Project Review Findings
+# Project Review Findings
 
 This document records the findings from the project review of 9 November 2026. The project is an offline-first synchronization MVP with replaceable storage and remote interfaces. The findings below describe work needed before relying on it in the field.
 
+## Implementation update — 13 November 2026
+
+The current review has been applied as a focused hardening change:
+
+- **Local responsiveness:** SerializedLocalStore locks local transactions rather
+  than HTTP calls. UI work is owned by a ViewModel and refresh jobs are coalesced.
+- **Server ownership:** endpoint-normalized journals, cursors, sync metadata and
+  drafts are isolated. Legacy files stay bound to their original configured URL.
+  Switching back resumes the existing queue without moving/deleting data.
+- **Draft safety:** editor state uses SavedStateHandle; local persistence must
+  succeed before the editor closes. Save errors preserve fields. Retrying a
+  restored draft retains its task ID. Saved state is not a durable draft database.
+- **Stale UI updates:** status writes read the latest local JSON under the same
+  lock as the write. Whole-record conflicts between independent clients remain
+  the documented v1 policy; optimistic conflict detection is not implemented.
+- **History costs:** no events for empty polls; recovery streams encoded history;
+  indexed local sequences/entity lookup and direct feed slices avoid several
+  scans. Collection copies, unbounded history and many event files remain.
+- **Packaging:** core/Retrofit Maven publications include metadata. A separate
+  Java Gradle project resolves and exercises them from a workspace repository.
+- **Evidence:** meaningful regression/device tests replace Android template tests;
+  BENCHMARKS.md and VALIDATION.md define initial measurements and open acceptance.
+
+Current verification: 49 host tests passed (43 core, 2 Retrofit, 2 backend,
+2 Android URL-identity tests). Both debug application and instrumentation APKs
+compiled. Local Maven publication and the separate Java consumer passed. The
+100/1,000/3,000-operation desktop smoke benchmark completed with zero idle event
+growth; the 3,000-operation reopen took 16.2 seconds on this machine. Raw results
+and limitations are in BENCHMARKS.md. No Android device was connected, so the
+instrumentation suite and manual device scenarios remain unexecuted.
+
+Still open: connected-device execution, repeated comparative network experiments,
+versioned conflict handling, database/compaction design, automatic detection of a
+reset server at an unchanged URL, per-user authorization and production transport.
+The sections dated 9 and 12 November below remain historical evidence.
 ## Implementation update — 12 November 2026
 
 - **Finding 1:** Journal writes reject events over 16 MiB before publication. The file-backed server limits each change page to 8 MiB of encoded changes. Regression tests cover large histories, reopening and oversized-page rejection.

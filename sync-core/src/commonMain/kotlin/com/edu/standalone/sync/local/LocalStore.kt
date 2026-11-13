@@ -6,6 +6,11 @@ import com.edu.standalone.sync.remote.ChangesPage
 
 /** Контракт локального хранилища данных **/
 interface LocalStore {
+    /** Highest stored sequence plus one. Call and save under the same ownership boundary. */
+    fun nextSequence(clientId: String): Long =
+        (getOperations().filter { it.clientId == clientId }.maxOfOrNull { it.localSequence } ?: 0L) + 1
+    /** IDs known locally, including deleted records. Use get() to read visible values. */
+    fun getEntityIds(): Set<String> = error("Listing is unsupported by this adapter")
     /** Download cursor; pages and cursor must commit atomically. */
     fun getCursor(): Long = 0L
 

@@ -18,14 +18,21 @@ Adapters:
 - `FileRemoteStore`: synchronized durable acceptance and deduplication history.
 - `HttpRemoteStore`: blocking HTTP adapter with finite timeouts and explicit
   temporary-error classification.
+- `SerializedLocalStore`: protects individual local calls and compound `access`
+  transactions. Run network calls outside `access`, and serialize sync passes
+  separately. The Android repository follows this ownership model.
 
 Each new event is fsynced and atomically published under `<file>.events/`.
 Existing version-1 snapshot files remain readable and are retained as the base.
 Backups and moves must include both the base file (if present) and its `.events`
 directory. Older library versions cannot read the new events. Never delete or
 rename individual event files. Unpublished `.tmp` files are ignored on recovery.
-History is retained indefinitely. Writes no longer replay or rewrite all history,
-but in-memory collection copies, startup replay and the number of event files
+History is retained indefinitely. Recovery streams events without retaining a
+second encoded history; empty pages validate their cursor without a journal write.
+Entity lookup and sequence allocation use indexes, and the server slices its
+acceptance-ordered feed without scanning/sorting all history for each page.
+Writes no longer replay or rewrite all history, but in-memory collection copies,
+startup replay and the number of event files
 still grow with history. Large installations need a database adapter or a separately
 designed compaction protocol. Atomic rename support is required; directory metadata
 power-loss durability remains filesystem dependent.
@@ -42,8 +49,15 @@ The Retrofit adapter accepts an injected OkHttpClient for credentials, TLS setti
 and timeouts. The default client uses 30-second connect/read and 60-second call limits.
 
 The `sync-server` Java application is also a Java consumer of the library.
-The Android demo provides record editing, manual synchronization and delivery
-inspection with a persistent client ID. [REST protocol](../docs/REST.md).
+The Android demo provides task creation/status changes, cached search, pending
+and rejection indicators, and WorkManager scheduling with a persistent client ID.
+Its ViewModel retains drafts in saved state and awaits successful local persistence
+before closing the editor. [REST protocol](../docs/REST.md).
+
+Maven coordinates: `com.edu.standalone:sync-core-jvm:0.1.0-SNAPSHOT` and
+`com.edu.standalone:sync-retrofit-jvm:0.1.0-SNAPSHOT`. Local publication and a
+separate Java consumer are described in [examples/jvm-consumer](../examples/jvm-consumer/README.md).
+Publication includes dependency metadata; public-registry distribution is not configured.
 
 Build: `gradlew :sync-core:jvmTest :sync-core:jvmJar :sync-server:build
 :app:assembleDebug`. Server: `gradlew :sync-server:run` (optional arguments:

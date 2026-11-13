@@ -23,8 +23,20 @@ Server acceptance is serialized and committed before responding. Reopening the
 server file restores revisions and deduplication. GET responses never advance a
 client cursor by themselves. Local page contents and cursor commit together.
 
-The demo listens on port 8080 and all interfaces for emulator/device access.
-It has no authentication or TLS and is intended for local test data only.
+The demo uses port 8080 and binds to loopback by default. SYNC_BIND_ADDRESS
+overrides the binding; Docker publishes only to host loopback. SYNC_API_TOKEN
+enables shared Bearer authentication, including health. There is no built-in
+TLS or per-user authorization. See the server README for deployment boundaries.
 Default Android emulator endpoint: `http://10.0.2.2:8080`.
-Android starts synchronization explicitly using its Synchronize button;
-background scheduling is deferred. No second KMP platform is claimed.
+Android schedules WorkManager after startup, local edits and endpoint changes.
+Network calls run outside the serialized local transaction boundary. Each
+normalized endpoint owns its journal, cursor and sync status; old data remains
+bound to its previous endpoint. Returning to that endpoint resumes its queue.
+URL identity cannot detect a server reset at the same address: retain the server
+history, or use a new endpoint identity. No second KMP platform is claimed.
+
+Protocol v1 replaces full records in server acceptance order. It has no base
+entity version or explicit conflict negotiation. Concurrent edits to different
+fields can overwrite one another. A future optimistic-concurrency protocol needs
+versioning, server enforcement, migration rules and client conflict presentation;
+it must not be described as an existing v1 guarantee.

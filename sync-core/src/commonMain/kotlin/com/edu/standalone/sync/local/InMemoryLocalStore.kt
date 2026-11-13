@@ -8,23 +8,28 @@ class InMemoryLocalStore : LocalStore {
     private var confirmed = emptyMap<String, String?>()
     private var operations = emptyList<SyncOperation>()
     private var deliveries = emptyMap<String, OperationDelivery>()
+    private var byEntity = emptyMap<String, List<SyncOperation>>()
+    private var sequences = emptyMap<String, Long>()
     private var cursor = 0L
 
     /** Immutable collections can be shared until either instance publishes a replacement. */
     internal fun fork() = InMemoryLocalStore().also {
         it.confirmed = confirmed; it.operations = operations
         it.deliveries = deliveries; it.cursor = cursor
+        it.byEntity = byEntity; it.sequences = sequences
     }
 
     override fun get(entityId: String): String? {
-        val overlay = operations.lastOrNull {
+        val overlay = byEntity[entityId]?.lastOrNull {
             val delivery = deliveries.getValue(it.operationId)
-            it.entityId == entityId && (delivery.status == DeliveryStatus.PENDING ||
+            (delivery.status == DeliveryStatus.PENDING ||
                 (delivery.status == DeliveryStatus.ACKNOWLEDGED && (delivery.serverRevision ?: Long.MAX_VALUE) > cursor))
         }
         return if (overlay != null) overlay.payload else confirmed[entityId]
     }
     override fun getOperations() = operations.toList()
+    override fun getEntityIds(): Set<String> = confirmed.keys + byEntity.keys
+    override fun nextSequence(clientId: String) = (sequences[clientId] ?: 0L) + 1
     override fun getDelivery(operationId: String) = deliveries[operationId]
     override fun getCursor() = cursor
     override fun saveLocalOperation(operation: SyncOperation) {
@@ -33,6 +38,8 @@ class InMemoryLocalStore : LocalStore {
         val nextDeliveries = deliveries + (operation.operationId to OperationDelivery(operation.operationId))
         operations = nextOperations
         deliveries = nextDeliveries
+        byEntity = byEntity + (operation.entityId to (byEntity[operation.entityId].orEmpty() + operation))
+        sequences = sequences + (operation.clientId to maxOf(sequences[operation.clientId] ?: 0L, operation.localSequence))
     }
     override fun getPendingOperations(clientId: String) = operations.filter {
         it.clientId == clientId && deliveries.getValue(it.operationId).status == DeliveryStatus.PENDING

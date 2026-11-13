@@ -32,12 +32,21 @@ class FileLocalStore(file: File) : LocalStore {
         memory = candidate
     }
     override fun get(entityId: String) = memory.get(entityId)
+    override fun getEntityIds() = memory.getEntityIds()
     override fun getOperations() = memory.getOperations()
     override fun getDelivery(operationId: String) = memory.getDelivery(operationId)
     override fun getPendingOperations(clientId: String) = memory.getPendingOperations(clientId)
     override fun getCursor() = memory.getCursor()
+    override fun nextSequence(clientId: String) = memory.nextSequence(clientId)
     override fun saveLocalOperation(operation: SyncOperation) = commit(Wire.encode { it.writeByte(0); Wire.operation(it, operation) })
-    override fun applyRemotePage(page: ChangesPage) = commit(Wire.encode { it.writeByte(1); Wire.page(it, page) })
+    override fun applyRemotePage(page: ChangesPage) {
+        if (page.remoteChanges.isEmpty()) {
+            // Validate the cursor even when no disk mutation is necessary.
+            memory.applyRemotePage(page)
+            return
+        }
+        commit(Wire.encode { it.writeByte(1); Wire.page(it, page) })
+    }
     override fun saveDelivery(delivery: OperationDelivery) = commit(Wire.encode {
         it.writeByte(2); Wire.text(it, delivery.operationId); it.writeInt(delivery.status.ordinal)
         it.writeInt(delivery.attemptCount); it.writeBoolean(delivery.lastError != null)

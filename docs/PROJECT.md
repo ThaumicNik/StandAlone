@@ -1,5 +1,13 @@
 # Project Context: Модуль устойчивой синхронизации данных
 
+> Implementation status (13 November 2026): this document describes the broader
+> thesis goals. Protocol v1 currently uses server-order whole-record replacement,
+> without base-version conflict detection. The backend is Java/file-backed;
+> Room/Ktor/PostgreSQL and additional platforms remain proposals. See PROGRESS.md
+> for current implementation, VALIDATION.md for acceptance, and BENCHMARKS.md for
+> the initial desktop measurements. A compiling app does not establish device
+> behavior or complete the experimental research.
+
 ## 1. Общая информация
 
 **Тип проекта:** выпускная квалификационная работа (бакалавриат), исследовательско-прикладной программный проект.
